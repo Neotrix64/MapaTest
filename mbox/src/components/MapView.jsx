@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import RouteModal from './RouteModal'; // Importa el modal
+import axios from 'axios'; // Para hacer peticiones a la API
 
 function MapView() {
   const mapContainerRef = useRef(null);
@@ -9,6 +10,7 @@ function MapView() {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [nearestStop, setNearestStop] = useState(null); // Guardamos la parada más cercana
 
   useEffect(() => {
     mapboxgl.accessToken = 'pk.eyJ1IjoibmVvZGV2IiwiYSI6ImNtOGQ4ZmIxMzBtc2kybHBzdzNxa3U4eDcifQ.1Oa8lXU045VvFUul26Kwkg';
@@ -79,38 +81,56 @@ function MapView() {
         .then((data) => {
           console.log('Datos de la ruta:', data); // Verifica los datos recibidos
   
-          const route = data.routes[0].geometry;
+          if (data.routes && data.routes.length > 0) {
+            const route = data.routes[0].geometry;
   
-          // Dibujar la ruta en el mapa
-          if (map) {
-            if (map.getSource('route')) {
-              map.getSource('route').setData(route);
-            } else {
-              map.addSource('route', {
-                type: 'geojson',
-                data: route,
-              });
+            // Dibujar la ruta en el mapa
+            if (map) {
+              if (map.getSource('route')) {
+                map.getSource('route').setData(route);
+              } else {
+                map.addSource('route', {
+                  type: 'geojson',
+                  data: route,
+                });
   
-              map.addLayer({
-                id: 'route',
-                type: 'line',
-                source: 'route',
-                layout: {
-                  'line-join': 'round',
-                  'line-cap': 'round',
-                },
-                paint: {
-                  'line-color': '#3887be',
-                  'line-width': 5,
-                },
-              });
+                map.addLayer({
+                  id: 'route',
+                  type: 'line',
+                  source: 'route',
+                  layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round',
+                  },
+                  paint: {
+                    'line-color': '#3887be',
+                    'line-width': 5,
+                  },
+                });
+              }
             }
+  
+            // Verificar las paradas cercanas si están disponibles en los datos de la ruta
+            if (data.routes[0].legs && data.routes[0].legs.length > 0) {
+              const leg = data.routes[0].legs[0];
+              const steps = leg.steps || [];
+  
+              if (steps.length > 0) {
+                const closestStop = steps[0].maneuver.location; // O ajusta según la parada que desees
+                console.log('Parada más cercana:', closestStop);
+              } else {
+                console.log('No se encontraron paradas cercanas.');
+              }
+            }
+          } else {
+            console.error('No se encontró una ruta válida.');
           }
         })
         .catch((error) => {
-          console.error('Error al obtener la ruta:', error);
+          console.error('Error al obtener la ruta o paradas cercanas:', error);
         });
     }
+  
     setIsModalOpen(false); // Cierra el modal
   };
   
@@ -133,6 +153,7 @@ function MapView() {
         <RouteModal
           destination={destination}
           userLocation={userLocation}
+          nearestStop={nearestStop} // Pasamos la parada más cercana al modal
           onConfirm={handleModalConfirm}
           onCancel={handleModalCancel}
         />
