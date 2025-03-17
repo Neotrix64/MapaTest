@@ -110,18 +110,22 @@ function MapView() {
               }
             }
   
-            // Verificar las paradas cercanas si están disponibles en los datos de la ruta
-            if (data.routes[0].legs && data.routes[0].legs.length > 0) {
-              const leg = data.routes[0].legs[0];
-              const steps = leg.steps || [];
-  
-              if (steps.length > 0) {
-                const closestStop = steps[0].maneuver.location; // O ajusta según la parada que desees
-                console.log('Parada más cercana:', closestStop);
-              } else {
-                console.log('No se encontraron paradas cercanas.');
-              }
-            }
+            // Realizar la solicitud a tu API para obtener la parada más cercana
+            axios
+              .get('http://localhost:3001/ruta/cercanas', {
+                params: {
+                  lat: userLocation.latitude,
+                  lng: userLocation.longitude,
+                },
+              })
+              .then((response) => {
+                // Aquí se supone que la API devuelve la parada más cercana
+                const closestStop = response.data.parada; // Ajusta según la respuesta de tu API
+                setNearestStop(closestStop); // Establecer la parada más cercana en el estado
+              })
+              .catch((error) => {
+                console.error('Error al obtener la parada más cercana:', error);
+              });
           } else {
             console.error('No se encontró una ruta válida.');
           }
@@ -133,6 +137,7 @@ function MapView() {
   
     setIsModalOpen(false); // Cierra el modal
   };
+  
   
 
   const handleModalCancel = () => {
