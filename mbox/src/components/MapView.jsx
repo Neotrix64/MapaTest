@@ -67,7 +67,8 @@ function MapView() {
   const handleModalConfirm = () => {
     if (userLocation && destination) {
       // Calcular la ruta usando Mapbox Directions API
-      const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.longitude},${userLocation.latitude};${destination.lng},${destination.lat}?alternatives=true&geometries=geojson&steps=true&access_token=${mapboxgl.accessToken}`;
+      const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.longitude},${userLocation.latitude};${destination.lng},${destination.lat}?alternatives=true&geometries=geojson&steps=true&overview=full&access_token=${mapboxgl.accessToken}`;
+
   
       console.log('Solicitud a Mapbox:', directionsUrl); // Verifica la URL generada
   
