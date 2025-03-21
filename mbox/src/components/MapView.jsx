@@ -66,78 +66,115 @@ function MapView() {
 
   const handleModalConfirm = () => {
     if (userLocation && destination) {
-      // Calcular la ruta usando Mapbox Directions API
       const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.longitude},${userLocation.latitude};${destination.lng},${destination.lat}?alternatives=true&geometries=geojson&steps=true&overview=full&access_token=${mapboxgl.accessToken}`;
-
   
-      console.log('Solicitud a Mapbox:', directionsUrl); // Verifica la URL generada
+      console.log('Solicitud a Mapbox:', directionsUrl);
   
       fetch(directionsUrl)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Error al obtener la ruta');
-          }
-          return response.json();
-        })
+        .then((response) => response.ok ? response.json() : Promise.reject("Error al obtener la ruta"))
         .then((data) => {
-          console.log('Datos de la ruta:', data); // Verifica los datos recibidos
+          console.log('Datos de la ruta:', data);
   
-          if (data.routes && data.routes.length > 0) {
+          if (data.routes?.length > 0) {
             const route = data.routes[0].geometry;
   
-            // Dibujar la ruta en el mapa
             if (map) {
               if (map.getSource('route')) {
                 map.getSource('route').setData(route);
               } else {
-                map.addSource('route', {
-                  type: 'geojson',
-                  data: route,
-                });
+                map.addSource('route', { type: 'geojson', data: route });
   
                 map.addLayer({
                   id: 'route',
                   type: 'line',
                   source: 'route',
-                  layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round',
-                  },
-                  paint: {
-                    'line-color': '#3887be',
-                    'line-width': 5,
-                  },
+                  layout: { 'line-join': 'round', 'line-cap': 'round' },
+                  paint: { 'line-color': '#3887be', 'line-width': 5 },
                 });
               }
             }
   
-            // Realizar la solicitud a tu API para obtener la parada más cercana
-            axios
-              .get('http://localhost:3001/ruta/cercanas', {
-                params: {
-                  lat: userLocation.latitude,
-                  lng: userLocation.longitude,
-                },
-              })
-              .then((response) => {
-                // Aquí se supone que la API devuelve la parada más cercana
-                const closestStop = response.data.parada; // Ajusta según la respuesta de tu API
-                setNearestStop(closestStop); // Establecer la parada más cercana en el estado
-              })
-              .catch((error) => {
-                console.error('Error al obtener la parada más cercana:', error);
-              });
+            // 🔹 Función para dibujar líneas del metro y sus marcadores
+            const drawMetroLine = (lineName, sourceId, layerId, color, markerColor) => {
+              axios.get('http://localhost:3001/metro/findParades', {
+                params: { nombreRuta: lineName }
+              }).then((response) => {
+                const metroStops = response.data.message;
+  
+                if (!metroStops || metroStops.length < 2) {
+                  console.warn(`No hay suficientes paradas para dibujar ${lineName}.`);
+                  return;
+                }
+  
+                let metroCoordinates = [];
+                metroStops.forEach((parada, index) => {
+                  const [lat, lng] = parada.ubicacion.coordinates;
+                  metroCoordinates.push([lng, lat]); // 🔄 Intercambiamos el orden para Mapbox
+                  console.log(`${lineName} - Parada ${index + 1}: ${parada.nombre} → (${lng}, ${lat})`);
+  
+                  const el = document.createElement("div");
+                  el.className = "marker";
+                  el.style.backgroundColor = "#8EFFC1";
+                  el.style.width = "12px";
+                  el.style.height = "12px";
+                  el.style.borderRadius = "50%";
+  
+                  new mapboxgl.Marker(el)
+                    .setLngLat([lng, lat])
+                    .setPopup(new mapboxgl.Popup().setHTML(`<b>${parada.nombre}</b>`))
+                    .addTo(map);
+                });
+  
+                if (map && metroCoordinates.length > 1) {
+                  const metroGeoJson = {
+                    type: "Feature",
+                    geometry: {
+                      type: "LineString",
+                      coordinates: metroCoordinates,
+                    }
+                  };
+  
+                  if (map.getSource(sourceId)) {
+                    map.getSource(sourceId).setData(metroGeoJson);
+                  } else {
+                    map.addSource(sourceId, { type: "geojson", data: metroGeoJson });
+  
+                    map.addLayer({
+                      id: layerId,
+                      type: "line",
+                      source: sourceId,
+                      layout: { "line-join": "round", "line-cap": "round" },
+                      paint: { "line-color": color, "line-width": 8, "line-opacity": 1 },
+                    });
+                  }
+                } else {
+                  console.warn(`Mapa no disponible o no hay suficientes coordenadas para ${lineName}.`);
+                }
+              }).catch(err => console.error(`Error obteniendo paradas de ${lineName}:`, err));
+            };
+  
+            // 🔹 Dibujar Línea 1 (Azul) con marcadores azules
+            drawMetroLine("Línea 1 Metro SD", "metro-line-1", "metro-layer-1", "#0000FF", "#0000FF");
+  
+            // 🔹 Dibujar Línea 2 (Rojo) con marcadores rojos
+            drawMetroLine("Línea 2 Metro SD", "metro-line-2", "metro-layer-2", "#FF0000", "#FF0000");
+  
+            // 🔹 Obtener la parada más cercana
+            axios.get('http://localhost:3001/ruta/cercanas', {
+              params: { lat: userLocation.latitude, lng: userLocation.longitude }
+            }).then((response) => {
+              setNearestStop(response.data.parada);
+            }).catch((error) => console.error('Error obteniendo la parada más cercana:', error));
           } else {
             console.error('No se encontró una ruta válida.');
           }
         })
-        .catch((error) => {
-          console.error('Error al obtener la ruta o paradas cercanas:', error);
-        });
+        .catch(error => console.error('Error al obtener la ruta:', error));
     }
   
-    setIsModalOpen(false); // Cierra el modal
+    setIsModalOpen(false);
   };
+  
   
   
 

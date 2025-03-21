@@ -1,6 +1,6 @@
 import React from 'react';
 
-function RouteModal({ destination, userLocation, onConfirm, onCancel }) {
+function RouteModal({ destination, userLocation, onConfirm, onCancel, nearestStop }) {
   if (!destination || !userLocation) return null;
 
   return (
@@ -38,6 +38,7 @@ function RouteModal({ destination, userLocation, onConfirm, onCancel }) {
         <div className="mt-4">
           <p className="text-sm font-medium text-gray-800">Latitud: {destination.lat}</p>
           <p className="text-sm font-medium text-gray-800">Longitud: {destination.lng}</p>
+          <p className="text-sm font-medium text-gray-800">Parada cercana: {nearestStop}</p>
         </div>
 
         {/* Espacio entre la información y los botones */}
