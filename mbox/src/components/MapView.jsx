@@ -10,15 +10,15 @@ function MapView() {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [nearestStop, setNearestStop] = useState(null); // Guardamos la parada más cercana
+  const [nearestStop, setNearestStop] = useState(null);
 
   useEffect(() => {
     mapboxgl.accessToken = 'pk.eyJ1IjoibmVvZGV2IiwiYSI6ImNtOGQ4ZmIxMzBtc2kybHBzdzNxa3U4eDcifQ.1Oa8lXU045VvFUul26Kwkg';
 
     const initialMap = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v11', // Estilo más amigable
-      center: [-74.0242, 40.6941], // Coordenadas iniciales
+      style: 'mapbox://styles/mapbox/streets-v11', 
+      center: [-74.0242, 40.6941],
       zoom: 14,
     });
 
@@ -109,21 +109,33 @@ function MapView() {
                 let metroCoordinates = [];
                 metroStops.forEach((parada, index) => {
                   const [lat, lng] = parada.ubicacion.coordinates;
-                  metroCoordinates.push([lng, lat]); // 🔄 Intercambiamos el orden para Mapbox
+                  metroCoordinates.push([lng, lat]);
                   console.log(`${lineName} - Parada ${index + 1}: ${parada.nombre} → (${lng}, ${lat})`);
+
+
+                const el = document.createElement("div");
+                el.className = "marker";
+                el.style.backgroundColor = "#fff";
+                el.style.width = "25px";
+                el.style.height = "25px";
+                el.style.borderRadius = "50%";
+                el.style.display = "flex";
+                el.style.alignItems = "center";
+                el.style.justifyContent = "center";
+                el.style.border = `2px solid ${color}`;
+                el.style.fontSize = "10px";
+                el.style.fontWeight = "bold";
+                el.style.color = "#000"; // Texto negro
   
-                  const el = document.createElement("div");
-                  el.className = "marker";
-                  el.style.backgroundColor = "#8EFFC1";
-                  el.style.width = "12px";
-                  el.style.height = "12px";
-                  el.style.borderRadius = "50%";
-  
-                  new mapboxgl.Marker(el)
-                    .setLngLat([lng, lat])
-                    .setPopup(new mapboxgl.Popup().setHTML(`<b>${parada.nombre}</b>`))
-                    .addTo(map);
-                });
+                const label = document.createElement("span");
+                label.innerText = parada.nombre[0]; // Primera letra de la parada
+                el.appendChild(label);
+
+                new mapboxgl.Marker(el)
+                  .setLngLat([lng, lat])
+                  .setPopup(new mapboxgl.Popup().setHTML(`<b style="color: #000;">${parada.nombre}</b>`))
+                  .addTo(map);
+              });
   
                 if (map && metroCoordinates.length > 1) {
                   const metroGeoJson = {
@@ -144,7 +156,7 @@ function MapView() {
                       type: "line",
                       source: sourceId,
                       layout: { "line-join": "round", "line-cap": "round" },
-                      paint: { "line-color": color, "line-width": 8, "line-opacity": 1 },
+                      paint: { "line-color": color, "line-width": 6, "line-opacity": 1 },
                     });
                   }
                 } else {
@@ -153,17 +165,15 @@ function MapView() {
               }).catch(err => console.error(`Error obteniendo paradas de ${lineName}:`, err));
             };
   
-            // 🔹 Dibujar Línea 1 (Azul) con marcadores azules
             drawMetroLine("Línea 1 Metro SD", "metro-line-1", "metro-layer-1", "#0000FF", "#0000FF");
   
-            // 🔹 Dibujar Línea 2 (Rojo) con marcadores rojos
             drawMetroLine("Línea 2 Metro SD", "metro-line-2", "metro-layer-2", "#FF0000", "#FF0000");
   
             // 🔹 Obtener la parada más cercana
-            axios.get('http://localhost:3001/ruta/cercanas', {
+            axios.get('http://localhost:3001/ruta/PosiblesCercanasInicio', {
               params: { lat: userLocation.latitude, lng: userLocation.longitude }
             }).then((response) => {
-              setNearestStop(response.data.parada);
+              console.log(response);
             }).catch((error) => console.error('Error obteniendo la parada más cercana:', error));
           } else {
             console.error('No se encontró una ruta válida.');
