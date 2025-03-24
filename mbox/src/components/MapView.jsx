@@ -13,9 +13,11 @@ function MapView() {
   const [destLng, setDestLng] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nearestStop, setNearestStop] = useState(null);
+  
 
   useEffect(() => {
     mapboxgl.accessToken = 'pk.eyJ1IjoibmVvZGV2IiwiYSI6ImNtOGQ4ZmIxMzBtc2kybHBzdzNxa3U4eDcifQ.1Oa8lXU045VvFUul26Kwkg';
+
 
     const initialMap = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -78,7 +80,12 @@ function MapView() {
   
       // Obtener la parada más cercana al destino
       axios.get('http://localhost:3001/ruta/PosiblesCercanas', {
-        params: { lat: destination.lat, lng: destination.lng }
+        params: {
+          lat: destination.lat,
+          lng: destination.lng,
+          destinoLat: userLocation.latitude,  // ➜ Agregado
+          destinoLng: userLocation.longitude // ➜ Agregado
+        }
       })
       .then((destRes) => {
         const nearestDestStop = destRes.data.message && destRes.data.message.length > 0 ? destRes.data.message[0] : null;
@@ -92,7 +99,12 @@ function MapView() {
   
         // Obtener la parada más cercana al usuario
         axios.get('http://localhost:3001/ruta/PosiblesCercanas', {
-          params: { lat: userLocation.latitude, lng: userLocation.longitude }
+          params: {
+            lat: userLocation.latitude,
+            lng: userLocation.longitude,
+            destinoLat: destination.lat,  // ➜ Agregado
+            destinoLng: destination.lng   // ➜ Agregado
+          }
         })
         .then((startRes) => {
           const nearestStartStop = startRes.data.message && startRes.data.message.length > 0 ? startRes.data.message[0] : null;
@@ -156,7 +168,6 @@ function MapView() {
                 // Agregar los nuevos marcadores al estado de activeMarkers
                 setActiveMarkers([startMarker, destMarker]);
               }
-  
               // 🔹 Dibujar líneas del metro y sus marcadores
               const drawMetroLine = (lineName, sourceId, layerId, color) => {
                 axios.get('http://localhost:3001/metro/findParades', {
@@ -244,6 +255,7 @@ function MapView() {
   };
   
   
+  
 
   const handleModalCancel = () => {
     setIsModalOpen(false); // Cierra el modal sin hacer nada
@@ -258,6 +270,10 @@ function MapView() {
         Localízame
       </button>
 
+      <button style={{ position: 'absolute', top: '10px', left: '200px', zIndex: 1000 }}>
+      Mostrar rutas de autobús
+    </button>
+    
       {/* Mostrar el modal si está abierto */}
       {isModalOpen && destination && (
         <RouteModal
