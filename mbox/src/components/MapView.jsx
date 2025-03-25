@@ -168,6 +168,94 @@ function MapView() {
                 // Agregar los nuevos marcadores al estado de activeMarkers
                 setActiveMarkers([startMarker, destMarker]);
               }
+
+              const drawRoutesLines = (color) => {
+                axios
+                  .get("http://localhost:3001/ruta/all", {
+                    params: {
+                      lat: userLocation.latitude,
+                      lng: userLocation.longitude,
+                      destinoLat: destination.lat,
+                      destinoLng: destination.lng,
+                    },
+                  })
+                  .then((response) => {
+                    const rutas = response.data;
+              
+                    rutas.forEach((ruta, index) => {
+                      if (!ruta.paradas || ruta.paradas.length < 2) {
+                        console.warn(`La ruta ${ruta.nombre} no tiene suficientes paradas.`);
+                        return;
+                      }
+              
+                      const paradas = ruta.paradas
+                        .map((parada) => {
+                          if (!parada.ubicacion || !Array.isArray(parada.ubicacion.coordinates) || parada.ubicacion.coordinates.length < 2) {
+                            console.warn(`Parada ${parada.nombre} tiene coordenadas inválidas.`);
+                            return null;
+                          }
+                          const [lat, lng] = parada.ubicacion.coordinates;
+                          console.log(`Parada ${parada.nombre}: (${lng}, ${lat})`);
+                          
+                          // Crear marcador visual para la parada
+                          const el = document.createElement("div");
+                          el.className = "marker";
+                          el.style.backgroundColor = "#fff";
+                          el.style.width = "25px";
+                          el.style.height = "25px";
+                          el.style.borderRadius = "50%";
+                          el.style.display = "flex";
+                          el.style.alignItems = "center";
+                          el.style.justifyContent = "center";
+                          el.style.border = `2px solid ${color}`;
+                          el.style.fontSize = "10px";
+                          el.style.fontWeight = "bold";
+              
+                          new mapboxgl.Marker(el)
+                            .setLngLat([lng, lat])
+                            .setPopup(new mapboxgl.Popup().setHTML(`<b style="color: #000;">${parada.nombre}</b>`))
+                            .addTo(map);
+              
+                          return [lng, lat];
+                        })
+                        .filter(Boolean); // Filtra valores nulos
+              
+                      if (map && paradas.length > 1) {
+                        const sourceId = `route-source-${index}`;
+                        const layerId = `route-layer-${index}`;
+              
+                        const routeGeoJson = {
+                          type: "Feature",
+                          geometry: {
+                            type: "LineString",
+                            coordinates: paradas,
+                          },
+                        };
+              
+                        if (map.getSource(sourceId)) {
+                          map.getSource(sourceId).setData(routeGeoJson);
+                        } else {
+                          map.addSource(sourceId, { type: "geojson", data: routeGeoJson });
+              
+                          map.addLayer({
+                            id: layerId,
+                            type: "line",
+                            source: sourceId,
+                            layout: { "line-join": "round", "line-cap": "round" },
+                            paint: { "line-color": color, "line-width": 4, "line-opacity": 0.8 },
+                          });
+                        }
+                      } else {
+                        console.warn(`No hay suficientes coordenadas para trazar la ruta ${ruta.nombre}.`);
+                      }
+                    });
+                  })
+                  .catch((error) => console.error("Error al obtener rutas:", error));
+              };
+              
+
+
+
               // 🔹 Dibujar líneas del metro y sus marcadores
               const drawMetroLine = (lineName, sourceId, layerId, color) => {
                 axios.get('http://localhost:3001/metro/findParades', {
@@ -237,7 +325,8 @@ function MapView() {
                   }
                 }).catch(err => console.error(`Error obteniendo paradas de ${lineName}:`, err));
               };
-  
+              //dame un hex verde 
+              drawRoutesLines("#00FF00");
               drawMetroLine("Línea 1 Metro SD", "metro-line-1", "metro-layer-1", "#0000FF");
               drawMetroLine("Línea 2 Metro SD", "metro-line-2", "metro-layer-2", "#FF0000");
   
@@ -253,9 +342,6 @@ function MapView() {
   
     setIsModalOpen(false);
   };
-  
-  
-  
 
   const handleModalCancel = () => {
     setIsModalOpen(false); // Cierra el modal sin hacer nada
