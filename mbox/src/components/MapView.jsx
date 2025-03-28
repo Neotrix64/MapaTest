@@ -3,6 +3,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import RouteModal from './RouteModal'; // Importa el modal
 import axios from 'axios'; // Para hacer peticiones a la API
+import DirectionModal from './DirectionModal';
+import ParadeModal from './ParadeModal';
 
 function MapView() {
   const mapContainerRef = useRef(null);
@@ -13,6 +15,7 @@ function MapView() {
   const [destLng, setDestLng] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [nearestStop, setNearestStop] = useState(null);
+  const [direcciones, setDirecciones] = useState([]);
   
 
   useEffect(() => {
@@ -77,6 +80,9 @@ function MapView() {
       // Primero, eliminamos los marcadores anteriores
       activeMarkers.forEach(marker => marker.remove());
       setActiveMarkers([]);  // Limpiar el estado de los marcadores
+      if(direcciones.length > 0){
+        setDirecciones([]);
+      }
   
       // Obtener la parada más cercana al destino
       axios.get('http://localhost:3001/ruta/PosiblesCercanas', {
@@ -84,7 +90,8 @@ function MapView() {
           lat: destination.lat,
           lng: destination.lng,
           destinoLat: userLocation.latitude,  // ➜ Agregado
-          destinoLng: userLocation.longitude // ➜ Agregado
+          destinoLng: userLocation.longitude, // ➜ Agregado
+          circunstancia: "final"
         }
       })
       .then((destRes) => {
@@ -94,8 +101,8 @@ function MapView() {
           console.warn("No se encontró una parada cercana al destino.");
           return;
         }
-  
-        console.log("Parada más cercana al destino:", nearestDestStop);
+
+        console.log("Parada más cercana de termino al destino:", nearestDestStop);
   
         // Obtener la parada más cercana al usuario
         axios.get('http://localhost:3001/ruta/PosiblesCercanas', {
@@ -103,16 +110,36 @@ function MapView() {
             lat: userLocation.latitude,
             lng: userLocation.longitude,
             destinoLat: destination.lat,  // ➜ Agregado
-            destinoLng: destination.lng   // ➜ Agregado
+            destinoLng: destination.lng,   // ➜ Agregado
+            circunstancia: "inicio"
           }
         })
         .then((startRes) => {
           const nearestStartStop = startRes.data.message && startRes.data.message.length > 0 ? startRes.data.message[0] : null;
+
+          console.log("Parada más cercana de inicio al usuario:", nearestStartStop);
+
+          direcciones.push({
+            direccion: `Dirigete a ${nearestStartStop.nombreParada}`,
+            tipo: nearestStartStop.tipo
+          });
   
           if (!nearestStartStop) {
             console.warn("No se encontró una parada cercana al usuario.");
             return;
           }
+
+          direcciones.push({
+            direccion: `Bajate en ${nearestDestStop.nombreParada}`,
+            tipo: nearestDestStop.tipo
+          });
+
+          if(nearestStartStop.nombreParada === nearestDestStop.nombreParada){
+            console.warn("No es necesario tomar esta parada ya que esta cerca del usuario.");
+            return
+          }
+
+          if(nearestStartStop.tipo === 'Metro' && nearestDestStop.tipo === 'Metro'){}
   
           console.log("Parada más cercana al usuario:", nearestStartStop);
   
@@ -123,7 +150,7 @@ function MapView() {
           }
   
           const waypoint = `${nearestStartStop.ubicacion[1]},${nearestStartStop.ubicacion[0]}`;
-  
+          
           // 🔹 Crear la URL con la parada intermedia
           const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.longitude},${userLocation.latitude};${waypoint};${destination.lng},${destination.lat}?alternatives=true&geometries=geojson&steps=true&overview=full&access_token=${mapboxgl.accessToken}`;
   
@@ -132,7 +159,6 @@ function MapView() {
           fetch(directionsUrl)
             .then((response) => response.ok ? response.json() : Promise.reject("Error al obtener la ruta"))
             .then((data) => {
-              console.log('Datos de la ruta con waypoint:', data);
   
               if (data.routes?.length > 0) {
                 const route = data.routes[0].geometry;
@@ -252,10 +278,6 @@ function MapView() {
                   })
                   .catch((error) => console.error("Error al obtener rutas:", error));
               };
-              
-
-
-
               // 🔹 Dibujar líneas del metro y sus marcadores
               const drawMetroLine = (lineName, sourceId, layerId, color) => {
                 axios.get('http://localhost:3001/metro/findParades', {
@@ -272,7 +294,7 @@ function MapView() {
                   metroStops.forEach((parada, index) => {
                     const [lat, lng] = parada.ubicacion.coordinates;
                     metroCoordinates.push([lng, lat]);
-                    console.log(`${lineName} - Parada ${index + 1}: ${parada.nombre} → (${lng}, ${lat})`);
+                    // console.log(`${lineName} - Parada ${index + 1}: ${parada.nombre} → (${lng}, ${lat})`);
   
                     const el = document.createElement("div");
                     el.className = "marker";
@@ -324,8 +346,7 @@ function MapView() {
                     console.warn(`Mapa no disponible o no hay suficientes coordenadas para ${lineName}.`);
                   }
                 }).catch(err => console.error(`Error obteniendo paradas de ${lineName}:`, err));
-              };
-              //dame un hex verde 
+              }; 
               drawRoutesLines("#00FF00");
               drawMetroLine("Línea 1 Metro SD", "metro-line-1", "metro-layer-1", "#0000FF");
               drawMetroLine("Línea 2 Metro SD", "metro-line-2", "metro-layer-2", "#FF0000");
@@ -351,14 +372,21 @@ function MapView() {
     <div>
       <button
         onClick={handleLocateMe}
-        style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 1000 }}
+        style={{ position: 'absolute', top: '10px', left: '10px', zIndex: 80 }}
       >
         Localízame
       </button>
 
-      <button style={{ position: 'absolute', top: '10px', left: '200px', zIndex: 1000 }}>
+      <button style={{ position: 'absolute', top: '10px', left: '150px', zIndex: 80 }}>
       Mostrar rutas de autobús
     </button>
+
+    <button style={{ position: 'absolute', top: '10px', left: '400px', zIndex: 80 }}>
+      Mostrar rutas de metro
+    </button>
+
+    <DirectionModal directions={direcciones}/>
+    {/* <ParadeModal/> */}
     
       {/* Mostrar el modal si está abierto */}
       {isModalOpen && destination && (
